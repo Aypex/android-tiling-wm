@@ -1,0 +1,16 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+build/
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Screenshots pulled during testing
+/tmp/tile_screenshot_*.png
