@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tiling WM</string>
+    <string name="checking_status">Checking Shizuku status…</string>
+    <string name="shizuku_not_installed">Shizuku is not installed. Install it from the Play Store or GitHub.</string>
+    <string name="shizuku_not_running">Shizuku is not running. Start it via ADB:\nadb shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh</string>
+    <string name="permission_required">Shizuku permission required.</string>
+    <string name="permission_denied">Permission denied. Tap to retry.</string>
+    <string name="connected">Connected to Shizuku. Enable the Accessibility Service, then start tiling.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="start_tiling">Start Tiling</string>
+    <string name="stop_tiling">Stop Tiling</string>
+    <string name="retry">Retry</string>
+    <string name="open_accessibility">Open Accessibility Settings</string>
+    <string name="accessibility_service_description">Monitors window changes to automatically tile windows in a master+stack layout.</string>
+</resources>
