@@ -114,9 +114,9 @@ The `setup` command enables these (all persist across reboots):
 Settings.Global.enable_freeform_support = 1
 Settings.Global.force_resizable_activities = 1
 Settings.Global.enable_non_resizable_multi_window = 1
-Settings.Global.force_desktop_mode_on_external_displays = 1
-Settings.Secure.desktop_mode = 1
 ```
+
+> **Note:** `desktop_mode` and `force_desktop_mode_on_external_displays` are intentionally **not** set — they lock Pixel Launcher to landscape and aren't needed for freeform windowing on the phone's primary display.
 
 ## License
 

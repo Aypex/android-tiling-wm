@@ -19,6 +19,7 @@ LAYOUT="${TILE_LAYOUT:-master-stack}"
 MASTER_RATIO="${TILE_MASTER_RATIO:-55}"  # percent of screen width for master
 STATUS_BAR_HEIGHT=100                     # pixels, adjust per device
 NAV_BAR_HEIGHT=100                        # pixels, adjust per device
+STATE_FILE="/tmp/.tile_managed_pkgs"      # tracks packages we launched
 
 # --- Helpers ---
 
@@ -38,22 +39,30 @@ get_screen_size() {
     SCREEN_H="${size#*x}"
 }
 
+_dump_activities() {
+    # Cache dumpsys output for the duration of a command to avoid repeated calls
+    if [[ -z "${_DUMPSYS_CACHE:-}" ]]; then
+        _DUMPSYS_CACHE=$(adb shell "dumpsys activity activities" 2>/dev/null)
+    fi
+    echo "$_DUMPSYS_CACHE"
+}
+
 get_freeform_tasks() {
-    # Returns lines like: taskId packageName bounds
-    adb shell "dumpsys activity activities" 2>/dev/null | \
-        grep -oP 'Task\{[^ ]+ #\K\d+(?= .* mode=freeform)' || true
+    # Returns unique task IDs for all freeform tasks
+    _dump_activities | \
+        grep -oP '^\s+\* Task\{[^ ]+ #\K\d+(?= .* mode=freeform)' | sort -u || true
 }
 
 get_task_info() {
     local task_id="$1"
-    adb shell "dumpsys activity activities" 2>/dev/null | \
-        grep -A3 "Task{.*#${task_id} " | head -4
+    _dump_activities | \
+        grep -A3 "^\s\+\* Task{.*#${task_id} " | head -4
 }
 
 get_all_visible_tasks() {
-    # Returns unique taskId lines for visible freeform tasks
-    adb shell "dumpsys activity activities" 2>/dev/null | \
-        grep -P 'Task\{.*visible=true.*mode=freeform' | \
+    # Returns unique task IDs for visible freeform tasks
+    _dump_activities | \
+        grep -P '^\s+\* Task\{.*visible=true.*mode=freeform' | \
         grep -oP '#\K\d+' | sort -u || true
 }
 
@@ -64,8 +73,9 @@ cmd_setup() {
     adb shell settings put global enable_freeform_support 1
     adb shell settings put global force_resizable_activities 1
     adb shell settings put global enable_non_resizable_multi_window 1
-    adb shell settings put global force_desktop_mode_on_external_displays 1
-    adb shell settings put secure desktop_mode 1
+    # NOTE: desktop_mode and force_desktop_mode_on_external_displays intentionally
+    # omitted — they lock Pixel Launcher to landscape and aren't needed for
+    # freeform windowing on the phone's primary display.
     echo "Done. Freeform windowing enabled."
     echo ""
     echo "Verify with: adb shell settings get global enable_freeform_support"
@@ -82,18 +92,48 @@ cmd_launch() {
 
     echo "Launching $activity in freeform mode..."
     adb shell am start -n "$activity" --windowingMode 5 -f 0x10000000
+    # Track this package for restore
+    grep -qxF "$pkg" "$STATE_FILE" 2>/dev/null || echo "$pkg" >> "$STATE_FILE"
     echo "Launched. Use 'tile.sh tile' to arrange windows."
 }
 
+cmd_restore() {
+    # Bring back all previously-launched freeform windows after home/recents.
+    # Uses the state file to know which packages we manage.
+    [[ -f "$STATE_FILE" ]] || die "No managed windows. Launch some first with: tile.sh launch <pkg>"
+
+    local count=0
+    while IFS= read -r pkg; do
+        [[ -n "$pkg" ]] || continue
+        local activity
+        activity=$(adb shell cmd package resolve-activity --brief "$pkg" 2>/dev/null | tail -1)
+        if [[ -n "$activity" ]]; then
+            adb shell am start -n "$activity" --windowingMode 5 -f 0x10000000 >/dev/null 2>&1
+            echo "  Restored: $pkg"
+            ((count++))
+        fi
+    done < "$STATE_FILE"
+
+    echo "Restored $count windows."
+    sleep 0.5
+    echo "Re-tiling..."
+    _DUMPSYS_CACHE=""
+    cmd_tile
+}
+
 cmd_list() {
-    echo "Visible freeform tasks:"
+    _DUMPSYS_CACHE=""  # force fresh dump
+    echo "Freeform tasks:"
     echo "---"
-    adb shell "dumpsys activity activities" 2>/dev/null | \
-        grep -P 'Task\{.*mode=freeform' | \
-        sed 's/.*Task{/  Task{/' | \
+    local seen=""
+    _dump_activities | \
+        grep -P '^\s+\* Task\{.*mode=freeform' | \
         while read -r line; do
             local tid
             tid=$(echo "$line" | grep -oP '#\K\d+')
+            # Deduplicate (tasks appear in multiple dumpsys sections)
+            echo "$seen" | grep -qw "$tid" && continue
+            seen="$seen $tid"
             local pkg
             pkg=$(echo "$line" | grep -oP 'A=\d+:\K[^ ]+')
             local vis
@@ -104,6 +144,11 @@ cmd_list() {
 }
 
 cmd_tile() {
+    _DUMPSYS_CACHE=""  # force fresh dump
+    # Force landscape — tiling on a phone only makes sense with the wider axis
+    adb shell settings put system accelerometer_rotation 0
+    adb shell settings put system user_rotation 1  # 1 = landscape
+    sleep 0.5
     get_screen_size
     # Read task IDs into array
     local -a task_arr=()
@@ -218,6 +263,7 @@ cmd_close() {
 }
 
 cmd_reset() {
+    _DUMPSYS_CACHE=""
     echo "Returning all freeform tasks to fullscreen..."
     local tasks
     tasks=$(get_freeform_tasks)
@@ -227,7 +273,11 @@ cmd_reset() {
         adb shell am task resize "$tid" 0 0 "$SCREEN_W" "$SCREEN_H"
         echo "  Task #$tid → fullscreen"
     done <<< "$tasks"
-    echo "Done."
+    # Restore portrait + auto-rotate
+    adb shell settings put system user_rotation 0
+    adb shell settings put system accelerometer_rotation 1
+    rm -f "$STATE_FILE"
+    echo "Done. Rotation restored to auto."
 }
 
 cmd_screenshot() {
@@ -240,12 +290,33 @@ cmd_screenshot() {
     echo "Screenshot saved to $path"
 }
 
+cmd_watch() {
+    local interval="${1:-2}"
+    echo "Watching for changes every ${interval}s (Ctrl+C to stop)..."
+    local prev_state=""
+    while true; do
+        _DUMPSYS_CACHE=""  # force fresh dump each loop
+        local cur_state
+        cur_state=$(get_all_visible_tasks | tr '\n' ' ')
+        local cur_size
+        cur_size=$(adb shell wm size | grep -oP '\d+x\d+' | tail -1)
+        local state_key="${cur_state}|${cur_size}"
+        if [[ "$state_key" != "$prev_state" ]]; then
+            echo "[$(date +%H:%M:%S)] Change detected — retiling..."
+            cmd_tile 2>/dev/null || echo "  (no windows to tile)"
+            prev_state="$state_key"
+        fi
+        sleep "$interval"
+    done
+}
+
 # --- Main ---
 
 require_adb
 
 case "${1:-help}" in
     setup)      cmd_setup ;;
+    restore)    cmd_restore ;;
     launch)     shift; cmd_launch "$@" ;;
     list)       cmd_list ;;
     tile)       cmd_tile ;;
@@ -253,11 +324,13 @@ case "${1:-help}" in
     close)      shift; cmd_close "$@" ;;
     reset)      cmd_reset ;;
     screenshot) cmd_screenshot ;;
+    watch)      shift; cmd_watch "$@" ;;
     help|*)
         echo "tile.sh — ADB-based tiling window manager for Android 16+"
         echo ""
         echo "Commands:"
         echo "  setup              Enable freeform windowing on device"
+        echo "  restore            Bring back freeform windows after home/recents"
         echo "  launch <pkg>       Launch app in freeform mode"
         echo "  tile               Tile all freeform windows"
         echo "  list               List visible freeform tasks"
@@ -265,6 +338,7 @@ case "${1:-help}" in
         echo "  close <taskId>     Close a task and re-tile"
         echo "  reset              Return all tasks to fullscreen"
         echo "  screenshot         Capture and pull screenshot"
+        echo "  watch [secs]       Auto-retile on window/rotation changes (default: 2s)"
         echo ""
         echo "Environment:"
         echo "  TILE_LAYOUT        Default layout (default: master-stack)"

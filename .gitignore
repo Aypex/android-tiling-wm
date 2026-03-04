@@ -5,8 +5,17 @@
 
 # Build
 build/
+**/build/
+.gradle/
 *.apk
 *.aab
+local.properties
+
+# Claude
+.claude/
+
+# Vendor (tracked separately or too large)
+vendor/
 
 # OS
 .DS_Store
