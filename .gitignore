@@ -23,3 +23,50 @@ Thumbs.db
 
 # Screenshots pulled during testing
 /tmp/tile_screenshot_*.png
+
+# === Universal not-source patterns ===
+# Rule of thumb: if it is not / will not be / should not be part of the
+# final production release of this project, ignore it. Exception:
+# README, LICENSE, CHANGELOG, CONTRIBUTING, etc. are kept tracked as
+# instructional material critical to the project regardless of runtime role.
+
+# Agent / AI tooling state
+.omc/
+
+# Python tool caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Virtual envs
+.venv/
+venv/
+
+# Editor / OS scratch
+*.swp
+*.swo
+*~
+
+# JS dependencies
+node_modules/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Coverage reports
+.coverage
+htmlcov/
+coverage.xml
