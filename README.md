@@ -1,3 +1,5 @@
+
+
 # android-tiling-wm
 
 An i3/Hyprland-style tiling window manager for Android 16+ phones. No root required.
@@ -49,6 +51,7 @@ The roadmap is a standalone Android app using Shizuku for privileged window mana
 | `tile.sh close <taskId>` | Close a task and re-tile remaining |
 | `tile.sh reset` | Return all tasks to fullscreen |
 | `tile.sh screenshot` | Capture and pull screenshot to /tmp/ |
+| `tile.sh watch [secs]` | Auto-retile on window/rotation changes (default: 2s) |
 
 ### Layouts
 
