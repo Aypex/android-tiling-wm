@@ -1,122 +1,112 @@
-# android-tiling-wm
+# android-tiling-wm (ATWM)
 
-An i3/Hyprland-style tiling window manager for Android 16+ phones. No root required.
+An i3/Hyprland-style tiling window manager for Android phones. No root required.
 
-## What is this?
+> ## ⚠️ Status: work-in-progress / proof-of-concept
+>
+> This is an experiment that has reached "demonstrably works on one device."
+> Nothing about the interface — the taskbar, the settings, the layouts, the
+> setup flow — is set in stone. Expect breaking changes between releases,
+> expect rough edges, and expect Android platform updates to break the
+> privileged internals from time to time (Android 17 already did, twice).
+> Issues and feedback are welcome; stability promises are not yet on offer.
 
-Android 16 supports freeform windowing on the phone's primary display — complete with native caption bars (title bar, minimize/maximize/close, drag-to-move, resize handles). This project uses that capability to tile app windows automatically, like a desktop tiling WM.
+## What it does
 
-**Key discovery:** Android 16 renders native window chrome on freeform windows on display 0. No LSPosed hooks, no custom ROM, no root. Just freeform mode + window resizing.
+Android's freeform windowing mode (hidden behind developer settings) can put
+ordinary apps in arbitrarily positioned, arbitrarily sized windows on the
+phone's primary display. This project drives that capability like a desktop
+tiling WM:
 
-## Current State
+- **Automatic tiling** — when tiling is active, visible apps are forced into
+  freeform mode and snapped into a layout (no manual dragging)
+- **Layouts**: Master+stack, Rows/Columns, Monocle — switchable from the taskbar
+- **Overlay taskbar** — pinned apps, folders, running-app indicators, app
+  drawer with search, settings panel (gaps, master ratio, accent color)
+- **Launcher mode** — optionally set it as your HOME app: transparent
+  wallpaper home screen with the taskbar as the whole interface
 
-**Proof of concept** — an ADB-based shell script (`tile.sh`) that demonstrates tiling works. Tested on Pixel 7a running Android 16 (API 36).
+Under the hood: [Shizuku](https://shizuku.rikka.app/) provides privileged
+access to `IActivityTaskManager` (task listing, freeform re-moding, window
+resizing) and an AccessibilityService provides window-change events that
+trigger re-tiling. Nothing needs root; Shizuku is started over ADB (wireless
+pairing works).
 
-The roadmap is a standalone Android app using Shizuku for privileged window management + AccessibilityService for window event tracking.
+## Current state (v0.1.0, tested 2026-08-30)
 
-## Quick Start
+Works on a **Pixel 10 Pro XL running Android 17 (API 37)**: apps tile into
+full-width rows in portrait (side-by-side in landscape), the taskbar, app
+drawer, folders and settings panel all function, and layout switching works
+live.
 
-### Prerequisites
+Known limitations, in honesty:
 
-- Android 16+ device
-- ADB connected via USB or WiFi
-- `adb` in your PATH
+- **Minimum screen size matters.** Android refuses real freeform windowing on
+  small displays. On a Pixel 7a this project degrades to split-screen-like
+  behavior; on the larger Pixel 10 Pro XL it works. If your phone is small,
+  this probably won't work for you.
+- **No window chrome.** On the tested device/build, freeform windows render
+  without caption bars or grabbable borders — windows are only controllable
+  through the tiling engine, not by touch-dragging.
+- **Hidden-API dependent.** The privileged layer talks to unstable Android
+  internals via reflection. OS updates can and do break it (see
+  `WindowTilingServiceImpl.kt` for the Android 17 fixes). Failures are logged
+  under the `ATWM-Shizuku` / `ATWM-Tiling` logcat tags.
+- Tested on exactly one device and one Android build. Reports from other
+  devices are genuinely useful.
 
-### Setup
+## Install & setup
+
+1. Install [Shizuku](https://shizuku.rikka.app/) and start it (ADB method).
+2. Install the ATWM APK (grab it from the
+   [releases page](https://github.com/Aypex/android-tiling-wm/releases), or
+   build with `./gradlew assembleDebug`).
+3. Enable freeform windowing (once, persists across reboots):
+   ```bash
+   adb shell settings put global enable_freeform_support 1
+   adb shell settings put global force_resizable_activities 1
+   ```
+4. Open **Tiling WM**, follow the permission flow (overlay → notifications →
+   Shizuku), then enable the accessibility service when prompted.
+
+   > If you enable the accessibility service via `adb shell settings put`
+   > instead of the Settings UI, **append** to the existing
+   > `enabled_accessibility_services` value — overwriting it disables every
+   > other accessibility service on the device.
+5. Tap **Start Tiling**. Launch a couple of apps and watch them snap.
+
+To try launcher mode: Settings → Apps → Default apps → Home app → Tiling WM.
+(Reversible the same way.)
+
+## Shell-script proof of concept (historical)
+
+The project started as an ADB-driven shell script, kept at
+[`scripts/tile.sh`](scripts/tile.sh). It still works as a zero-install demo
+and as reference for the `am`/`dumpsys`/`wm` command surface:
 
 ```bash
-# Enable freeform windowing on the device
-./scripts/tile.sh setup
-
-# Launch some apps in freeform mode
-./scripts/tile.sh launch com.android.settings
+./scripts/tile.sh setup                        # enable freeform settings
+./scripts/tile.sh launch com.android.settings  # launch apps in freeform
 ./scripts/tile.sh launch com.android.chrome
-./scripts/tile.sh launch com.google.android.apps.messaging
-
-# Tile them
-./scripts/tile.sh tile
+./scripts/tile.sh tile                         # tile them
+./scripts/tile.sh layout columns               # switch layout
+./scripts/tile.sh reset                        # back to fullscreen
 ```
 
-### Commands
+## Roadmap (loose, subject to change)
 
-| Command | Description |
-|---------|-------------|
-| `tile.sh setup` | Enable freeform windowing settings on device |
-| `tile.sh launch <pkg>` | Launch an app in freeform mode |
-| `tile.sh tile` | Tile all visible freeform windows |
-| `tile.sh list` | List visible freeform tasks |
-| `tile.sh layout <name>` | Switch layout (master-stack, columns, monocle) |
-| `tile.sh close <taskId>` | Close a task and re-tile remaining |
-| `tile.sh reset` | Return all tasks to fullscreen |
-| `tile.sh screenshot` | Capture and pull screenshot to /tmp/ |
+- Grabbable window borders / manual resize affordances (needs investigation —
+  the platform doesn't draw chrome on the tested build)
+- Keyboard shortcut and gesture control
+- Per-app floating exceptions
+- More layouts (BSP, spiral)
+- Widget hosting and notification badges in launcher mode
 
-### Layouts
+## Technical details
 
-- **master-stack** (default) — One master pane on the left (55% width), remaining apps stacked vertically on the right
-- **columns** — Equal-width vertical columns
-- **monocle** — All windows fullscreen, last one on top
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TILE_LAYOUT` | `master-stack` | Default layout |
-| `TILE_MASTER_RATIO` | `55` | Master pane width as percentage |
-
-## How It Works
-
-1. `am start --windowingMode 5` launches apps in freeform mode on the phone screen
-2. `am task resize <taskId> <left> <top> <right> <bottom>` positions each window
-3. Android 16 automatically renders native caption bars (drag handle, minimize, maximize, close) on freeform windows
-
-That's it. The window management is built into Android — we're just driving it.
-
-## Roadmap
-
-### Phase 1: Tiling Engine (Standalone App)
-- [ ] Shizuku UserService with `resizeTask()` + `getTasks()` + `setTaskWindowingMode()`
-- [ ] AccessibilityService for window open/close/focus events
-- [ ] Master+stack layout algorithm
-- [ ] Event pipeline: accessibility event → debounce → get tasks → calculate layout → resize
-
-### Phase 2: Taskbar Fork Integration
-- [ ] Fork [Taskbar](https://github.com/farmerbb/Taskbar) (Apache 2.0)
-- [ ] Replace fire-and-forget launch with tiling-aware placement
-- [ ] Layout switching UI
-- [ ] Persistent tiling state
-
-### Phase 3: Polish
-- [ ] Additional layouts (BSP, spiral)
-- [ ] Keyboard shortcuts / gesture controls
-- [ ] Per-app floating exceptions
-- [ ] Gap/padding configuration
-
-## Requirements for the App (Future)
-
-- Android 16+ (API 36)
-- [Shizuku](https://shizuku.rikka.app/) running (no root needed — wireless ADB pairing works)
-- Accessibility service enabled
-
-## Technical Details
-
-See [docs/research-spec.md](docs/research-spec.md) for the full research spec, including:
-- AOSP source analysis of the freeform decoration system
-- Shizuku API surface (`IActivityTaskManager` methods)
-- Taskbar codebase analysis and fork hook points
-- Tiling engine architecture with AccessibilityService bridging
-- Known gotchas and limitations
-
-## Device Settings
-
-The `setup` command enables these (all persist across reboots):
-
-```
-Settings.Global.enable_freeform_support = 1
-Settings.Global.force_resizable_activities = 1
-Settings.Global.enable_non_resizable_multi_window = 1
-```
-
-> **Note:** `desktop_mode` and `force_desktop_mode_on_external_displays` are intentionally **not** set — they lock Pixel Launcher to landscape and aren't needed for freeform windowing on the phone's primary display.
+- [`docs/architecture-phase1.md`](docs/architecture-phase1.md) — app architecture
+- [`docs/research-spec.md`](docs/research-spec.md) — original research: AOSP
+  freeform internals, Shizuku API surface, known gotchas
 
 ## License
 
