@@ -14,8 +14,8 @@ class ColumnsLayout : LayoutStrategy {
         val gap = config.windowGap
         val results = mutableListOf<Rect>()
 
-        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-            // Vertical columns
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // Landscape: side-by-side columns
             val colWidth = (usableArea.width() - gap * (taskCount - 1)) / taskCount
             for (i in 0 until taskCount) {
                 val left = usableArea.left + i * (colWidth + gap)
@@ -23,7 +23,7 @@ class ColumnsLayout : LayoutStrategy {
                 results.add(Rect(left, usableArea.top, right, usableArea.bottom))
             }
         } else {
-            // Horizontal rows
+            // Portrait: full-width stacked rows
             val rowHeight = (usableArea.height() - gap * (taskCount - 1)) / taskCount
             for (i in 0 until taskCount) {
                 val top = usableArea.top + i * (rowHeight + gap)

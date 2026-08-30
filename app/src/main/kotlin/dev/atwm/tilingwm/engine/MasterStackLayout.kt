@@ -14,7 +14,8 @@ class MasterStackLayout : LayoutStrategy {
         val gap = config.windowGap
         val results = mutableListOf<Rect>()
 
-        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // Landscape: master on the left, stack splits the right column
             val masterWidth = ((usableArea.width() - gap) * config.masterRatio).toInt()
             val stackCount = taskCount - 1
 
@@ -36,7 +37,7 @@ class MasterStackLayout : LayoutStrategy {
                 results.add(Rect(stackLeft, top, usableArea.right, bottom))
             }
         } else {
-            // Landscape: master on top, stack splits bottom
+            // Portrait: master on top, stack splits the bottom
             val masterHeight = ((usableArea.height() - gap) * config.masterRatio).toInt()
             val stackCount = taskCount - 1
 
