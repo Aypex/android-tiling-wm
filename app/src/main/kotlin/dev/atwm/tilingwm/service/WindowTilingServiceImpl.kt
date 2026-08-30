@@ -2,6 +2,7 @@ package dev.atwm.tilingwm.service
 
 import android.annotation.SuppressLint
 import android.graphics.Rect
+import android.util.Log
 import dev.atwm.tilingwm.IWindowTilingService
 
 /**
@@ -10,6 +11,11 @@ import dev.atwm.tilingwm.IWindowTilingService
  */
 @SuppressLint("PrivateApi")
 class WindowTilingServiceImpl : IWindowTilingService.Stub() {
+
+    companion object {
+        private const val TAG = "ATWM-Shizuku"
+        private var dumpedMethods = false
+    }
 
     private val atm: Any by lazy {
         val smClass = Class.forName("android.os.ServiceManager")
@@ -30,8 +36,16 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
         atmClass.getMethod("resizeTask", Int::class.java, Rect::class.java, Int::class.java)
     }
 
-    private val setTaskWindowingModeMethod by lazy {
-        atmClass.getMethod("setTaskWindowingMode", Int::class.java, Int::class.java, Boolean::class.java)
+    // setTaskWindowingMode(int,int,boolean) was removed from IActivityTaskManager
+    // in Android 17. startActivityFromRecents(taskId, options) with a launch
+    // windowing mode in the options re-modes an existing task the same way
+    // `am start --windowingMode N` does.
+    private val startActivityFromRecentsMethod by lazy {
+        atmClass.getMethod("startActivityFromRecents", Int::class.java, android.os.Bundle::class.java)
+    }
+
+    private val setLaunchWindowingModeMethod by lazy {
+        android.app.ActivityOptions::class.java.getMethod("setLaunchWindowingMode", Int::class.java)
     }
 
     private val getTasksMethod by lazy {
@@ -42,15 +56,29 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
         try {
             resizeTaskMethod.invoke(atm, taskId, Rect(left, top, right, bottom), 0)
         } catch (e: Exception) {
-            // Reflection failure — silently ignore, task stays at current bounds
+            Log.e(TAG, "resizeTask($taskId) failed", e)
         }
     }
 
     override fun setTaskWindowingMode(taskId: Int, windowingMode: Int, toTop: Boolean) {
         try {
-            setTaskWindowingModeMethod.invoke(atm, taskId, windowingMode, toTop)
+            val options = android.app.ActivityOptions.makeBasic()
+            setLaunchWindowingModeMethod.invoke(options, windowingMode)
+            startActivityFromRecentsMethod.invoke(atm, taskId, options.toBundle())
         } catch (e: Exception) {
-            // Reflection failure — silently ignore
+            Log.e(TAG, "setTaskWindowingMode($taskId -> $windowingMode) failed", e)
+            if (!dumpedMethods) {
+                dumpedMethods = true
+                val interesting = atmClass.methods
+                    .filter { m ->
+                        m.name.contains("indowing") || m.name.contains("esize") ||
+                        m.name.contains("Task") || m.name.contains("Freeform")
+                    }
+                    .joinToString("\n") { m ->
+                        m.name + "(" + m.parameterTypes.joinToString(",") { it.simpleName } + ")"
+                    }
+                Log.e(TAG, "IActivityTaskManager candidate methods:\n$interesting")
+            }
         }
     }
 
@@ -70,19 +98,22 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
                 val offset = i * 6
                 result[offset] = task.javaClass.getField("taskId").getInt(task)
 
-                val bounds = task.javaClass.getField("bounds").get(task) as Rect
+                // TaskInfo.bounds was removed in Android 17; windowConfiguration
+                // carries the same rect on all supported versions.
+                val configuration = task.javaClass.getField("configuration").get(task)!!
+                val windowConfig = configuration.javaClass.getField("windowConfiguration").get(configuration)!!
+                val bounds = windowConfig.javaClass.getMethod("getBounds").invoke(windowConfig) as Rect
                 result[offset + 1] = bounds.left
                 result[offset + 2] = bounds.top
                 result[offset + 3] = bounds.right
                 result[offset + 4] = bounds.bottom
 
-                val configuration = task.javaClass.getField("configuration").get(task)!!
-                val windowConfig = configuration.javaClass.getField("windowConfiguration").get(configuration)!!
                 val getWindowingMode = windowConfig.javaClass.getMethod("getWindowingMode")
                 result[offset + 5] = getWindowingMode.invoke(windowConfig) as Int
             }
             return result
         } catch (e: Exception) {
+            Log.e(TAG, "getVisibleTaskInfo failed", e)
             return IntArray(0)
         }
     }
@@ -108,6 +139,7 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
                 }
             }.toTypedArray()
         } catch (e: Exception) {
+            Log.e(TAG, "getVisibleTaskPackages failed", e)
             return emptyArray()
         }
     }

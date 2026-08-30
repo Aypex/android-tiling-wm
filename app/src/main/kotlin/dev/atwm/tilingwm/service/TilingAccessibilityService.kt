@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.os.RemoteException
+import android.util.Log
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -18,6 +19,7 @@ import dev.atwm.tilingwm.model.TilingConfig
 class TilingAccessibilityService : AccessibilityService() {
 
     companion object {
+        private const val TAG = "ATWM-Tiling"
         var serviceConnection: ShizukuServiceConnection? = null
         var isEnabled: Boolean = false
         var instance: TilingAccessibilityService? = null
@@ -116,11 +118,16 @@ class TilingAccessibilityService : AccessibilityService() {
     }
 
     private fun retile() {
-        val svc = serviceConnection?.service ?: return
+        val svc = serviceConnection?.service
+        if (svc == null) {
+            Log.w(TAG, "retile: no Shizuku service connection")
+            return
+        }
 
         try {
             val taskInts = svc.getVisibleTaskInfo()
             val taskPkgs = svc.getVisibleTaskPackages()
+            Log.d(TAG, "retile: ${taskInts.size / 6} visible tasks, pkgs=${taskPkgs.joinToString()}")
 
             val tasks = mutableListOf<TaskInfo>()
             val count = taskInts.size / 6
@@ -169,6 +176,7 @@ class TilingAccessibilityService : AccessibilityService() {
                 )
             }
         } catch (e: RemoteException) {
+            Log.e(TAG, "retile: Shizuku connection lost", e)
             serviceConnection = null
         }
     }
