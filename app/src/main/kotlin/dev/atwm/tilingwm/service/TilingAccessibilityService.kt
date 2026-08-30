@@ -10,11 +10,13 @@ import android.util.Log
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import dev.atwm.tilingwm.chrome.BorderOverlayManager
 import dev.atwm.tilingwm.engine.LayoutStrategy
 import dev.atwm.tilingwm.engine.MasterStackLayout
 import dev.atwm.tilingwm.engine.TilingEngine
 import dev.atwm.tilingwm.model.TaskInfo
 import dev.atwm.tilingwm.model.TilingConfig
+import dev.atwm.tilingwm.util.TaskbarPrefs
 
 class TilingAccessibilityService : AccessibilityService() {
 
@@ -22,6 +24,10 @@ class TilingAccessibilityService : AccessibilityService() {
         private const val TAG = "ATWM-Tiling"
         var serviceConnection: ShizukuServiceConnection? = null
         var isEnabled: Boolean = false
+            set(value) {
+                field = value
+                if (!value) instance?.clearChrome()
+            }
         var instance: TilingAccessibilityService? = null
 
         var config = TilingConfig()
@@ -55,9 +61,21 @@ class TilingAccessibilityService : AccessibilityService() {
 
     private val retileRunnable = Runnable { retile() }
 
+    private var borders: BorderOverlayManager? = null
+    private var prefs: TaskbarPrefs? = null
+
     override fun onServiceConnected() {
         instance = this
         updateScreenMetrics()
+        prefs = TaskbarPrefs(this)
+        borders = BorderOverlayManager(this) { ratio ->
+            updateConfig(config.copy(masterRatio = ratio))
+            forceRetile()
+        }
+    }
+
+    fun clearChrome() {
+        borders?.clear()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -82,6 +100,7 @@ class TilingAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(retileRunnable)
+        clearChrome()
         instance = null
         super.onDestroy()
     }
@@ -156,12 +175,28 @@ class TilingAccessibilityService : AccessibilityService() {
                 }
             }
 
+            val usableArea = Rect(
+                0,
+                config.statusBarHeight,
+                screenWidth,
+                screenHeight - config.navBarHeight -
+                    (if (config.taskbarEnabled) config.taskbarHeightPx else 0)
+            )
+            val isPortrait = resources.configuration.orientation ==
+                Configuration.ORIENTATION_PORTRAIT
+            val accent = prefs?.getAccentColor() ?: 0xFF4FC3F7.toInt()
+
             // Single task: resize to fill usable area (no tiling needed)
             if (tileableTasks.size == 1) {
                 val task = tileableTasks[0]
-                val bottom = screenHeight - config.navBarHeight -
-                    (if (config.taskbarEnabled) config.taskbarHeightPx else 0)
-                svc.resizeTask(task.taskId, 0, config.statusBarHeight, screenWidth, bottom)
+                svc.resizeTask(
+                    task.taskId, usableArea.left, usableArea.top,
+                    usableArea.right, usableArea.bottom
+                )
+                borders?.update(
+                    listOf(usableArea), usableArea, accent,
+                    showDivider = false, isPortrait = isPortrait
+                )
                 return
             }
 
@@ -175,6 +210,12 @@ class TilingAccessibilityService : AccessibilityService() {
                     lb.bounds.right, lb.bounds.bottom
                 )
             }
+
+            borders?.update(
+                layout.map { it.bounds }, usableArea, accent,
+                showDivider = currentStrategy is MasterStackLayout,
+                isPortrait = isPortrait
+            )
         } catch (e: RemoteException) {
             Log.e(TAG, "retile: Shizuku connection lost", e)
             serviceConnection = null
