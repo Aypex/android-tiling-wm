@@ -7,7 +7,7 @@ import dev.atwm.tilingwm.model.TilingConfig
 
 class TilingEngine(
     private val config: TilingConfig,
-    private val strategy: LayoutStrategy
+    var strategy: LayoutStrategy
 ) {
     /**
      * Given visible tasks and screen dimensions, compute target bounds for each.
@@ -24,11 +24,14 @@ class TilingEngine(
 
         if (tileable.size < 2) return emptyList()
 
+        val bottomInset = config.navBarHeight +
+            if (config.taskbarEnabled) config.taskbarHeightPx else 0
+
         val usableArea = Rect(
             0,
             config.statusBarHeight,
             screenWidth,
-            screenHeight - config.navBarHeight
+            screenHeight - bottomInset
         )
 
         val bounds = strategy.calculateBounds(usableArea, tileable.size, config, orientation)

@@ -6,7 +6,10 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.os.RemoteException
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import dev.atwm.tilingwm.engine.LayoutStrategy
 import dev.atwm.tilingwm.engine.MasterStackLayout
 import dev.atwm.tilingwm.engine.TilingEngine
 import dev.atwm.tilingwm.model.TaskInfo
@@ -17,12 +20,33 @@ class TilingAccessibilityService : AccessibilityService() {
     companion object {
         var serviceConnection: ShizukuServiceConnection? = null
         var isEnabled: Boolean = false
+        var instance: TilingAccessibilityService? = null
+
+        var config = TilingConfig()
+            private set
+        var currentStrategy: LayoutStrategy = MasterStackLayout()
+            private set
+
+        fun updateConfig(newConfig: TilingConfig) {
+            config = newConfig
+            instance?.engine = TilingEngine(config, currentStrategy)
+        }
+
+        fun updateStrategy(strategy: LayoutStrategy) {
+            currentStrategy = strategy
+            instance?.engine = TilingEngine(config, currentStrategy)
+        }
+
+        private var runningAppsCallback: ((Set<String>) -> Unit)? = null
+
+        fun setOnRunningAppsChanged(callback: ((Set<String>) -> Unit)?) {
+            runningAppsCallback = callback
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
     private val debounceMs = 150L
-    private val config = TilingConfig()
-    private val engine = TilingEngine(config, MasterStackLayout())
+    private var engine = TilingEngine(config, currentStrategy)
 
     private var screenWidth = 0
     private var screenHeight = 0
@@ -30,6 +54,7 @@ class TilingAccessibilityService : AccessibilityService() {
     private val retileRunnable = Runnable { retile() }
 
     override fun onServiceConnected() {
+        instance = this
         updateScreenMetrics()
     }
 
@@ -47,7 +72,6 @@ class TilingAccessibilityService : AccessibilityService() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateScreenMetrics()
-        // Orientation change — retile immediately
         handler.removeCallbacks(retileRunnable)
         retile()
     }
@@ -56,24 +80,48 @@ class TilingAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(retileRunnable)
+        instance = null
         super.onDestroy()
+    }
+
+    fun forceRetile() {
+        handler.removeCallbacks(retileRunnable)
+        retile()
     }
 
     private fun updateScreenMetrics() {
         val dm = resources.displayMetrics
         screenWidth = dm.widthPixels
         screenHeight = dm.heightPixels
+        detectInsets()
+    }
+
+    private fun detectInsets() {
+        try {
+            val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+            val metrics = wm.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+            )
+            val newConfig = config.copy(
+                statusBarHeight = insets.top,
+                navBarHeight = insets.bottom
+            )
+            if (newConfig != config) {
+                updateConfig(newConfig)
+            }
+        } catch (_: Exception) {
+            // Fallback: keep existing values
+        }
     }
 
     private fun retile() {
         val svc = serviceConnection?.service ?: return
 
         try {
-            // Fetch current task state from Shizuku
             val taskInts = svc.getVisibleTaskInfo()
             val taskPkgs = svc.getVisibleTaskPackages()
 
-            // Parse into TaskInfo list
             val tasks = mutableListOf<TaskInfo>()
             val count = taskInts.size / 6
             for (i in 0 until count) {
@@ -89,25 +137,38 @@ class TilingAccessibilityService : AccessibilityService() {
                 ))
             }
 
-            val orientation = resources.configuration.orientation
-            val layout = engine.computeLayout(tasks, screenWidth, screenHeight, orientation)
+            // Notify running apps callback
+            val tileableTasks = tasks.filter { it.packageName !in config.excludedPackages }
+            val runningPkgs = tileableTasks.map { it.packageName }.toSet()
+            runningAppsCallback?.invoke(runningPkgs)
 
-            // Apply layout
-            for (lb in layout) {
-                val task = tasks.find { it.taskId == lb.taskId } ?: continue
-
-                // Switch to freeform if needed
+            // Force all tileable tasks into freeform mode (windowing mode 5)
+            for (task in tileableTasks) {
                 if (task.windowingMode != 5) {
                     svc.setTaskWindowingMode(task.taskId, 5, true)
                 }
+            }
 
+            // Single task: resize to fill usable area (no tiling needed)
+            if (tileableTasks.size == 1) {
+                val task = tileableTasks[0]
+                val bottom = screenHeight - config.navBarHeight -
+                    (if (config.taskbarEnabled) config.taskbarHeightPx else 0)
+                svc.resizeTask(task.taskId, 0, config.statusBarHeight, screenWidth, bottom)
+                return
+            }
+
+            // 2+ tasks: compute tiled layout
+            val orientation = resources.configuration.orientation
+            val layout = engine.computeLayout(tasks, screenWidth, screenHeight, orientation)
+
+            for (lb in layout) {
                 svc.resizeTask(
                     lb.taskId, lb.bounds.left, lb.bounds.top,
                     lb.bounds.right, lb.bounds.bottom
                 )
             }
         } catch (e: RemoteException) {
-            // Shizuku service died — null the reference so we stop retiling
             serviceConnection = null
         }
     }
