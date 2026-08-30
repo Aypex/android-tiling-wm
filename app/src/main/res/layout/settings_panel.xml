@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_backdrop"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/scrim"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="64dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_taskbar"
+        android:padding="16dp">
+
+        <!-- Section: Layout -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_layout"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/layout_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section: Window Gap -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_window_gap"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/gap_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section: Accent Color -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_accent"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/accent_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Section: Taskbar -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_taskbar"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btn_swap_sides"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/swap_start_position"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:layout_marginEnd="4dp" />
+
+            <TextView
+                android:id="@+id/btn_change_icon"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/pick_start_icon"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:layout_marginStart="4dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

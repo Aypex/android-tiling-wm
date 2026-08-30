@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Tiling grid icon: master + stack layout -->
+    <!-- Centered in 108x108 adaptive icon safe zone (66x66 centered at 54,54) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21,21h38v66h-38z" />
+    <path
+        android:fillColor="#CCCCCC"
+        android:pathData="M63,21h24v30h-24z" />
+    <path
+        android:fillColor="#AAAAAA"
+        android:pathData="M63,55h24v32h-24z" />
+</vector>

@@ -43,4 +43,5 @@ dependencies {
     implementation(libs.shizuku.provider)
     implementation(libs.hidden.api.bypass)
     implementation(libs.appcompat)
+    implementation(libs.recyclerview)
 }

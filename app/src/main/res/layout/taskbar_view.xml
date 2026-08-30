@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/taskbar_height"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_taskbar"
+    android:gravity="center_vertical"
+    android:paddingStart="@dimen/taskbar_padding"
+    android:paddingEnd="@dimen/taskbar_padding">
+
+    <!-- Start button zone -->
+    <FrameLayout
+        android:id="@+id/start_zone"
+        android:layout_width="@dimen/taskbar_icon_size"
+        android:layout_height="@dimen/taskbar_icon_size"
+        android:layout_marginEnd="@dimen/taskbar_padding" />
+
+    <!-- Center zone: pinned/running apps -->
+    <LinearLayout
+        android:id="@+id/center_zone"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical" />
+
+    <!-- Layout toggle zone -->
+    <FrameLayout
+        android:id="@+id/toggle_zone"
+        android:layout_width="@dimen/taskbar_icon_size"
+        android:layout_height="@dimen/taskbar_icon_size"
+        android:layout_marginStart="@dimen/taskbar_padding" />
+
+</LinearLayout>

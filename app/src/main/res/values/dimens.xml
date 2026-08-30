@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="taskbar_height">56dp</dimen>
+    <dimen name="taskbar_icon_size">48dp</dimen>
+    <dimen name="taskbar_padding">8dp</dimen>
+</resources>

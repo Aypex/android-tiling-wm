@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/taskbar_icon_size"
+    android:layout_height="@dimen/taskbar_icon_size"
+    android:layout_marginStart="4dp"
+    android:layout_marginEnd="4dp">
+
+    <ImageView
+        android:id="@+id/bar_app_icon"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:padding="4dp" />
+
+    <View
+        android:id="@+id/running_dot"
+        android:layout_width="6dp"
+        android:layout_height="6dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:background="@drawable/bg_running_dot"
+        android:visibility="gone" />
+</FrameLayout>

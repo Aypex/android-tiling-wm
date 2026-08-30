@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Surface -->
+    <color name="taskbar_bg">#CC1A1A1A</color>
+    <color name="surface">#FF222222</color>
+    <color name="surface_elevated">#FF333333</color>
+    <color name="scrim">#99000000</color>
+    <color name="dialog_bg">#E6222222</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFAAAAAA</color>
+    <color name="text_hint">#FF888888</color>
+    <color name="text_danger">#FFFF6666</color>
+
+    <!-- Icons -->
+    <color name="taskbar_icon_tint">#FFFFFF</color>
+
+    <!-- Accent (default light blue) -->
+    <color name="accent_default">#FF4FC3F7</color>
+
+    <!-- Border -->
+    <color name="border_chip">#FF555555</color>
+</resources>
