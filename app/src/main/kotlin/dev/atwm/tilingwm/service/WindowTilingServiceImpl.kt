@@ -144,6 +144,27 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
         }
     }
 
+    override fun ensureAccessibilityService(component: String) {
+        try {
+            val current = exec("settings", "get", "secure", "enabled_accessibility_services")
+                .trim().let { if (it == "null") "" else it }
+            if (current.split(':').contains(component)) return
+            val updated = if (current.isEmpty()) component else "$current:$component"
+            exec("settings", "put", "secure", "enabled_accessibility_services", updated)
+            exec("settings", "put", "secure", "accessibility_enabled", "1")
+            Log.i(TAG, "re-enabled accessibility service (OS had pruned it)")
+        } catch (e: Exception) {
+            Log.e(TAG, "ensureAccessibilityService failed", e)
+        }
+    }
+
+    private fun exec(vararg cmd: String): String {
+        val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText()
+        p.waitFor()
+        return out
+    }
+
     override fun destroy() {
         // Shizuku signals service shutdown by calling destroy(); the process
         // must exit itself or it leaks (one orphan per rebind/reinstall).

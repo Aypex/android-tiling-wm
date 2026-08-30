@@ -187,6 +187,20 @@ class MainActivity : AppCompatActivity(),
         actionButton.setOnClickListener { checkShizukuState() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Self-heal on return to the setup screen: covers the OS pruning the
+        // accessibility service while the app process was already alive
+        // (fresh binds heal in ShizukuServiceConnection.onServiceConnected).
+        try {
+            serviceConnection.service?.ensureAccessibilityService(
+                ShizukuServiceConnection.ACCESSIBILITY_COMPONENT
+            )
+        } catch (_: Exception) {
+            // Non-fatal; taskbar warning indicator covers it
+        }
+    }
+
     override fun onDestroy() {
         Shizuku.removeRequestPermissionResultListener(this)
         Shizuku.removeBinderReceivedListener(this)

@@ -15,4 +15,9 @@ interface IWindowTilingService {
 
     // Parallel string array of package names matching getVisibleTaskInfo() entries
     String[] getVisibleTaskPackages() = 4;
+
+    // Re-append the given accessibility service to enabled_accessibility_services
+    // if the OS pruned it (e.g. Android 17 removes force-stopped apps from the
+    // list). Appends only — never overwrites other enabled services.
+    void ensureAccessibilityService(String component) = 5;
 }

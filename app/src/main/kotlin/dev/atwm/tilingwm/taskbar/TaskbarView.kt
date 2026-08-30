@@ -132,6 +132,19 @@ class TaskbarView(context: Context) : LinearLayout(context) {
         }
     }
 
+    /**
+     * Warning state: tiling is enabled but the accessibility service is not
+     * running (e.g. the OS pruned it after a force-stop and Shizuku is not
+     * available to self-heal). Tints the layout button red.
+     */
+    fun setServiceWarning(broken: Boolean) {
+        if (broken) {
+            layoutButton.setColorFilter(0xFFE05555.toInt())
+        } else {
+            layoutButton.clearColorFilter()
+        }
+    }
+
     // -- Settings panel (long-press start or layout toggle) --
 
     private fun showSettingsPanel() {

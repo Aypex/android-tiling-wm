@@ -7,7 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import dev.atwm.tilingwm.MainActivity
 import dev.atwm.tilingwm.R
 import dev.atwm.tilingwm.taskbar.TaskbarOverlay
@@ -21,6 +23,19 @@ class TaskbarForegroundService : Service() {
     }
 
     private var overlay: TaskbarOverlay? = null
+    private val handler = Handler(Looper.getMainLooper())
+
+    // Surfaces the "tiling on but accessibility service dead" state on the
+    // taskbar. Indicator only — restoring the service is done on Shizuku
+    // connect (user intent), never forced mid-session.
+    private val healthCheck = object : Runnable {
+        override fun run() {
+            val broken = TilingAccessibilityService.isEnabled &&
+                TilingAccessibilityService.instance == null
+            overlay?.view?.setServiceWarning(broken)
+            handler.postDelayed(this, 2000)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -31,6 +46,7 @@ class TaskbarForegroundService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         )
         overlay = TaskbarOverlay(this).also { it.show() }
+        handler.post(healthCheck)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -44,6 +60,7 @@ class TaskbarForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        handler.removeCallbacks(healthCheck)
         overlay?.hide()
         overlay = null
         super.onDestroy()
