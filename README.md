@@ -95,12 +95,21 @@ and as reference for the `am`/`dumpsys`/`wm` command surface:
 
 ## Roadmap (loose, subject to change)
 
-- Grabbable window borders / manual resize affordances (needs investigation —
-  the platform doesn't draw chrome on the tested build)
+- More self-drawn window chrome: ATWM now draws window borders and a draggable
+  split divider (~30Hz live resize verified); next are per-edge drag handles
+  and titlebar buttons (close/maximize/minimize)
+- Workspaces (task-set bookkeeping — Android has no native concept to lean on)
 - Keyboard shortcut and gesture control
 - Per-app floating exceptions
 - More layouts (BSP, spiral)
 - Widget hosting and notification badges in launcher mode
+- **Research: compositor mode** — rendering apps into an ATWM-owned virtual
+  display (DeX-style) for full control over chrome, animations, and
+  workspaces. Known limitations before anyone asks: without a fragile
+  privileged grant, hosted windows are *viewer-grade* (touch works, but
+  keyboard focus and the IME stay on the real screen), and DRM-protected
+  apps (Netflix etc.) render black on any virtual display — that's Android's
+  content-protection model, not a fixable bug
 
 ## Technical details
 
