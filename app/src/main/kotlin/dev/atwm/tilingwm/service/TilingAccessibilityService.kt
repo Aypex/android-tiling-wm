@@ -64,6 +64,11 @@ class TilingAccessibilityService : AccessibilityService() {
     private var borders: BorderOverlayManager? = null
     private var prefs: TaskbarPrefs? = null
 
+    // Stable tile order by taskId: getTasks() returns recency order, which
+    // would promote whatever window was last touched to master. Windows keep
+    // their slot; new windows join the end of the stack.
+    private val windowOrder = mutableListOf<Int>()
+
     override fun onServiceConnected() {
         instance = this
         updateScreenMetrics()
@@ -164,9 +169,17 @@ class TilingAccessibilityService : AccessibilityService() {
             }
 
             // Notify running apps callback
-            val tileableTasks = tasks.filter { it.packageName !in config.excludedPackages }
-            val runningPkgs = tileableTasks.map { it.packageName }.toSet()
+            val visibleTileable = tasks.filter { it.packageName !in config.excludedPackages }
+            val runningPkgs = visibleTileable.map { it.packageName }.toSet()
             runningAppsCallback?.invoke(runningPkgs)
+
+            // Apply stable ordering
+            val visibleIds = visibleTileable.map { it.taskId }
+            windowOrder.retainAll(visibleIds)
+            for (id in visibleIds) if (id !in windowOrder) windowOrder.add(id)
+            val tileableTasks = windowOrder.mapNotNull { id ->
+                visibleTileable.find { it.taskId == id }
+            }
 
             // Force all tileable tasks into freeform mode (windowing mode 5)
             for (task in tileableTasks) {
@@ -202,7 +215,7 @@ class TilingAccessibilityService : AccessibilityService() {
 
             // 2+ tasks: compute tiled layout
             val orientation = resources.configuration.orientation
-            val layout = engine.computeLayout(tasks, screenWidth, screenHeight, orientation)
+            val layout = engine.computeLayout(tileableTasks, screenWidth, screenHeight, orientation)
 
             for (lb in layout) {
                 svc.resizeTask(
