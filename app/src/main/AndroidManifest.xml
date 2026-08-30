@@ -3,13 +3,42 @@
 
     <!-- Shizuku permission -->
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <!-- Taskbar overlay -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Notification for foreground service -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Query all installed apps for the app drawer (Android 11+) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TilingWM">
 
-        <!-- Main activity: Shizuku permission flow + tiling toggle -->
+        <!-- Launcher home screen: transparent wallpaper + overlay taskbar -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Setup activity: Shizuku permission flow + tiling toggle -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -19,6 +48,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Start button icon picker trampoline -->
+        <activity
+            android:name=".StartButtonPickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Shizuku content provider (required for Shizuku init) -->
         <provider
@@ -40,6 +75,16 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Taskbar foreground service -->
+        <service
+            android:name=".service.TaskbarForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Persistent taskbar overlay for tiling window management" />
         </service>
 
     </application>

@@ -1,13 +1,19 @@
 package dev.atwm.tilingwm
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import dev.atwm.tilingwm.model.TilingConfig
 import dev.atwm.tilingwm.service.ShizukuServiceConnection
+import dev.atwm.tilingwm.service.TaskbarForegroundService
 import dev.atwm.tilingwm.service.TilingAccessibilityService
 import dev.atwm.tilingwm.service.WindowTilingServiceImpl
 import rikka.shizuku.Shizuku
@@ -19,6 +25,8 @@ class MainActivity : AppCompatActivity(),
 
     companion object {
         private const val REQUEST_CODE = 1
+        private const val REQUEST_OVERLAY = 2
+        private const val REQUEST_NOTIFICATION = 3
     }
 
     private val serviceConnection = ShizukuServiceConnection()
@@ -42,6 +50,33 @@ class MainActivity : AppCompatActivity(),
         Shizuku.addBinderReceivedListener(this)
         Shizuku.addBinderDeadListener(this)
 
+        checkPermissionsAndStart()
+    }
+
+    private fun checkPermissionsAndStart() {
+        // Check overlay permission first
+        if (!Settings.canDrawOverlays(this)) {
+            statusText.text = getString(R.string.overlay_permission_required)
+            actionButton.text = getString(R.string.grant_overlay)
+            actionButton.setOnClickListener {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivityForResult(intent, REQUEST_OVERLAY)
+            }
+            actionButton.visibility = android.view.View.VISIBLE
+            return
+        }
+
+        // Check notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATION)
+            // Continue regardless — notification denial shouldn't block functionality
+        }
+
         checkShizukuState()
     }
 
@@ -60,7 +95,7 @@ class MainActivity : AppCompatActivity(),
             return
         }
 
-        if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
             bindUserService()
         } else {
             statusText.text = getString(R.string.permission_required)
@@ -77,6 +112,17 @@ class MainActivity : AppCompatActivity(),
 
         Shizuku.bindUserService(args, serviceConnection)
         TilingAccessibilityService.serviceConnection = serviceConnection
+
+        // Compute taskbar height in pixels and update config
+        val taskbarHeightPx = (56 * resources.displayMetrics.density).toInt()
+        TilingAccessibilityService.updateConfig(
+            TilingAccessibilityService.config.copy(taskbarHeightPx = taskbarHeightPx)
+        )
+
+        // Start taskbar foreground service
+        startForegroundService(
+            Intent(this, TaskbarForegroundService::class.java)
+        )
 
         statusText.text = getString(R.string.connected)
         actionButton.text = getString(R.string.start_tiling)
@@ -99,9 +145,29 @@ class MainActivity : AppCompatActivity(),
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
+    @Deprecated("Use registerForActivityResult")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_OVERLAY) {
+            checkPermissionsAndStart()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_NOTIFICATION) {
+            // Continue regardless of result
+            checkShizukuState()
+        }
+    }
+
     override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
         if (requestCode == REQUEST_CODE) {
-            if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (grantResult == PackageManager.PERMISSION_GRANTED) {
                 bindUserService()
             } else {
                 statusText.text = getString(R.string.permission_denied)
@@ -112,7 +178,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onBinderReceived() {
-        checkShizukuState()
+        checkPermissionsAndStart()
     }
 
     override fun onBinderDead() {
