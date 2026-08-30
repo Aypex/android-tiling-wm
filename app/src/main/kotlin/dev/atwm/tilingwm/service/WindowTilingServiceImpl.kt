@@ -145,6 +145,9 @@ class WindowTilingServiceImpl : IWindowTilingService.Stub() {
     }
 
     override fun destroy() {
-        // Called by Shizuku when unbinding. No cleanup needed.
+        // Shizuku signals service shutdown by calling destroy(); the process
+        // must exit itself or it leaks (one orphan per rebind/reinstall).
+        Log.i(TAG, "destroy: exiting user service process")
+        System.exit(0)
     }
 }
