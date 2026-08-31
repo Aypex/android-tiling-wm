@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     private val serviceConnection = ShizukuServiceConnection()
-    private var tilingEnabled = false
+    private var suiteUiActive = false
 
     private lateinit var statusText: TextView
     private lateinit var actionButton: Button
@@ -119,26 +119,27 @@ class MainActivity : AppCompatActivity(),
             TilingAccessibilityService.config.copy(taskbarHeightPx = taskbarHeightPx)
         )
 
-        // Start taskbar foreground service
-        startForegroundService(
-            Intent(this, TaskbarForegroundService::class.java)
-        )
-
         statusText.text = getString(R.string.connected)
-        actionButton.text = getString(R.string.start_tiling)
-        actionButton.setOnClickListener { toggleTiling() }
+        suiteUiActive = true
+        refreshSuiteButton()
+        actionButton.setOnClickListener { toggleSuite() }
         actionButton.visibility = android.view.View.VISIBLE
         accessibilityButton.visibility = android.view.View.VISIBLE
     }
 
-    private fun toggleTiling() {
-        tilingEnabled = !tilingEnabled
-        TilingAccessibilityService.isEnabled = tilingEnabled
-        actionButton.text = if (tilingEnabled) {
-            getString(R.string.stop_tiling)
-        } else {
-            getString(R.string.start_tiling)
-        }
+    // One tap drives the whole puppeteer suite: taskbar overlay + tiling
+    // engine together. The taskbar is no longer auto-started on entry, so
+    // "stopped" really means nothing of the puppeteer is on screen.
+    private fun toggleSuite() {
+        val turnOn = !TaskbarForegroundService.isRunning
+        val intent = Intent(this, TaskbarForegroundService::class.java)
+        if (turnOn) startForegroundService(intent) else stopService(intent)
+        TilingAccessibilityService.isEnabled = turnOn
+        refreshSuiteButton(turnOn)
+    }
+
+    private fun refreshSuiteButton(running: Boolean = TaskbarForegroundService.isRunning) {
+        actionButton.text = getString(if (running) R.string.stop_tiling else R.string.start_tiling)
     }
 
     private fun openAccessibilitySettings() {
@@ -189,6 +190,9 @@ class MainActivity : AppCompatActivity(),
 
     override fun onResume() {
         super.onResume()
+        // The suite can be started/stopped elsewhere (launcher mode, the
+        // notification's tiling toggle); re-sync the button on return.
+        if (suiteUiActive) refreshSuiteButton()
         // Self-heal on return to the setup screen: covers the OS pruning the
         // accessibility service while the app process was already alive
         // (fresh binds heal in ShizukuServiceConnection.onServiceConnected).

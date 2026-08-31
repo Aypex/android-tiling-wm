@@ -20,6 +20,11 @@ class TaskbarForegroundService : Service() {
         private const val CHANNEL_ID = "taskbar_channel"
         private const val NOTIFICATION_ID = 1
         const val ACTION_TOGGLE_TILING = "dev.atwm.tilingwm.TOGGLE_TILING"
+
+        /** Whether the taskbar is up — drives the setup screen's suite toggle. */
+        @Volatile
+        var isRunning = false
+            private set
     }
 
     private var overlay: TaskbarOverlay? = null
@@ -47,6 +52,7 @@ class TaskbarForegroundService : Service() {
         )
         overlay = TaskbarOverlay(this).also { it.show() }
         handler.post(healthCheck)
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -60,6 +66,7 @@ class TaskbarForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        isRunning = false
         handler.removeCallbacks(healthCheck)
         overlay?.hide()
         overlay = null
