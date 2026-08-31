@@ -5,6 +5,9 @@
     <color name="surface">#FF222222</color>
     <color name="surface_elevated">#FF333333</color>
     <color name="scrim">#99000000</color>
+    <!-- Near-opaque backdrop for the app drawer, so the app behind it is hidden
+         and tapping the backdrop to dismiss can't be mistaken for tapping the app. -->
+    <color name="drawer_scrim">#F0121212</color>
     <color name="dialog_bg">#E6222222</color>
 
     <!-- Text -->

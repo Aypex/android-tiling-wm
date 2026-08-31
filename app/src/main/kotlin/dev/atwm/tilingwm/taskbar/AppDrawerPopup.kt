@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -36,11 +37,19 @@ class AppDrawerPopup(private val context: Context) {
         val root = view.findViewById<FrameLayout>(R.id.drawer_root)
         val searchInput = view.findViewById<EditText>(R.id.drawer_search)
 
-        // Use real display height for accurate overlay positioning
+        // End the drawer exactly at the taskbar's top so the bar stays visible
+        // and tappable (to close the drawer) instead of being hidden under the
+        // app grid. The window is TOP-gravity and the system offsets it down by
+        // the status-bar inset, so its bottom = topInset + height; to land that
+        // bottom on the taskbar top we subtract BOTH the taskbar height and the
+        // top inset. (Subtracting the bottom inset was wrong — the taskbar spans
+        // to the physical bottom, so it doesn't need separate reservation.)
         val realScreenHeight = windowManager.maximumWindowMetrics.bounds.height()
+        val topInset = windowManager.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
         val density = context.resources.displayMetrics.density
         val taskbarPx = (56 * density).toInt()
-        val drawerWindowHeight = realScreenHeight - taskbarPx
+        val drawerWindowHeight = realScreenHeight - taskbarPx - topInset
 
         // Constrain the content panel to ~75% of the drawer window height
         val drawerContent = view.findViewById<View>(R.id.drawer_content)
