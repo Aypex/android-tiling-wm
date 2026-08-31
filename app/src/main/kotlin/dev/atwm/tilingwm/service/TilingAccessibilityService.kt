@@ -1,6 +1,8 @@
 package dev.atwm.tilingwm.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Handler
@@ -64,6 +66,21 @@ class TilingAccessibilityService : AccessibilityService() {
     private var borders: BorderOverlayManager? = null
     private var prefs: TaskbarPrefs? = null
 
+    // The current home launcher's package. It must never be tiled: a home task
+    // forced into freeform thrashes (the launcher peeks through a single
+    // freeform app, gets pulled into the layout, and fights it — flicker +
+    // stranded frames). config.excludedPackages only lists the stock launcher,
+    // so we detect whatever the user's actual launcher is and exclude it too.
+    private var homePackage: String? = null
+
+    private fun detectHomePackage(): String? = try {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.packageName
+    } catch (e: Exception) {
+        Log.w(TAG, "detectHomePackage failed", e); null
+    }
+
     // Stable tile order by taskId: getTasks() returns recency order, which
     // would promote whatever window was last touched to master. Windows keep
     // their slot; new windows join the end of the stack.
@@ -73,6 +90,8 @@ class TilingAccessibilityService : AccessibilityService() {
         instance = this
         updateScreenMetrics()
         prefs = TaskbarPrefs(this)
+        homePackage = detectHomePackage()
+        Log.d(TAG, "home launcher detected: $homePackage")
         borders = BorderOverlayManager(this) { ratio ->
             updateConfig(config.copy(masterRatio = ratio))
             forceRetile()
@@ -171,8 +190,12 @@ class TilingAccessibilityService : AccessibilityService() {
                 ))
             }
 
-            // Notify running apps callback
-            val visibleTileable = tasks.filter { it.packageName !in config.excludedPackages }
+            // Notify running apps callback. Exclude the configured packages AND
+            // the live home launcher (detected at connect) so the home screen is
+            // never treated as a tileable window.
+            if (homePackage == null) homePackage = detectHomePackage()
+            val excluded = config.excludedPackages + setOfNotNull(homePackage)
+            val visibleTileable = tasks.filter { it.packageName !in excluded }
             val runningPkgs = visibleTileable.map { it.packageName }.toSet()
             runningAppsCallback?.invoke(runningPkgs)
 
