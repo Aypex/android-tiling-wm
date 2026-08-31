@@ -51,8 +51,10 @@ class AppDrawerPopup(private val context: Context) {
             gravity = Gravity.BOTTOM
         }
 
-        val apps = AppLauncher.getInstalledApps(context)
-        val adapter = AppAdapter(apps)
+        // Populate from the warm cache if available (instant); otherwise show the
+        // window now with an empty grid and load the app list off the main thread,
+        // so the drawer appears immediately instead of stalling on enumeration.
+        val adapter = AppAdapter(AppLauncher.peekCachedApps() ?: emptyList())
 
         grid.layoutManager = GridLayoutManager(context, 5)
         grid.adapter = adapter
@@ -83,6 +85,14 @@ class AppDrawerPopup(private val context: Context) {
 
         windowManager.addView(view, params)
         rootView = view
+
+        // Cold cache: load off the main thread, then fill the grid.
+        if (AppLauncher.peekCachedApps() == null) {
+            Thread {
+                val apps = AppLauncher.getInstalledApps(context)
+                view.post { if (rootView === view) adapter.setApps(apps) }
+            }.apply { isDaemon = true }.start()
+        }
     }
 
     fun dismiss() {
@@ -95,12 +105,21 @@ class AppDrawerPopup(private val context: Context) {
     val isShowing: Boolean get() = rootView != null
 
     private inner class AppAdapter(
-        private val allApps: List<AppEntry>
+        allApps: List<AppEntry>
     ) : RecyclerView.Adapter<AppAdapter.ViewHolder>() {
 
+        private var allApps: List<AppEntry> = allApps
         private var filteredApps: List<AppEntry> = allApps
+        private var currentQuery: String = ""
+
+        /** Swap in the loaded app list (async cold-load path), preserving any filter. */
+        fun setApps(apps: List<AppEntry>) {
+            allApps = apps
+            filter(currentQuery)
+        }
 
         fun filter(query: String) {
+            currentQuery = query
             filteredApps = if (query.isBlank()) {
                 allApps
             } else {

@@ -70,6 +70,9 @@ class TaskbarView(context: Context) : LinearLayout(context) {
         toggleZone = findViewById(R.id.toggle_zone)
 
         IconCache.init(context)
+        // Warm the app-drawer list in the background so the first open is instant
+        // instead of stalling ~400ms enumerating apps on the main thread.
+        AppLauncher.preload(context)
         taskbarPrefs = TaskbarPrefs(context)
 
         // Apply start button position preference

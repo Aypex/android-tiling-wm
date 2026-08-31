@@ -18,7 +18,35 @@ data class AppEntry(
 
 object AppLauncher {
 
+    // Enumerating + labeling + sorting all launchable apps costs hundreds of ms
+    // on a device with many apps (~400ms for 386 apps), and it was re-run on
+    // every drawer open. Cache the result and refresh it off the main thread.
+    @Volatile
+    private var cachedApps: List<AppEntry>? = null
+
+    /** Cached list if already loaded, else null (caller can load async). */
+    fun peekCachedApps(): List<AppEntry>? = cachedApps
+
+    /** Kick off a background load so the first drawer open is warm. Idempotent. */
+    fun preload(context: Context) {
+        if (cachedApps != null) return
+        val app = context.applicationContext
+        Thread {
+            val apps = loadInstalledApps(app)
+            cachedApps = apps
+        }.apply { isDaemon = true }.start()
+    }
+
+    /** Returns the cache if present, otherwise loads synchronously and caches. */
     fun getInstalledApps(context: Context): List<AppEntry> {
+        cachedApps?.let { return it }
+        return loadInstalledApps(context).also { cachedApps = it }
+    }
+
+    /** Drop the cache so the next load re-enumerates (e.g. after install/remove). */
+    fun invalidateCache() { cachedApps = null }
+
+    private fun loadInstalledApps(context: Context): List<AppEntry> {
         val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val userHandle = android.os.Process.myUserHandle()
         val activities = launcherApps.getActivityList(null, userHandle)
