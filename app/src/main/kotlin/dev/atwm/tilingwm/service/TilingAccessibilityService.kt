@@ -144,7 +144,10 @@ class TilingAccessibilityService : AccessibilityService() {
     private fun retile() {
         val svc = serviceConnection?.service
         if (svc == null) {
+            // Can't tile without Shizuku — clear any chrome so border frames
+            // aren't stranded on screen with no code path to remove them.
             Log.w(TAG, "retile: no Shizuku service connection")
+            clearChrome()
             return
         }
 
@@ -230,7 +233,10 @@ class TilingAccessibilityService : AccessibilityService() {
                 isPortrait = isPortrait
             )
         } catch (e: RemoteException) {
+            // Connection lost mid-retile — clear chrome so frames aren't
+            // stranded, and drop the dead connection.
             Log.e(TAG, "retile: Shizuku connection lost", e)
+            clearChrome()
             serviceConnection = null
         }
     }
